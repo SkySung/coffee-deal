@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DB_FILE="$SCRIPT_DIR/backend/database.db"
 FRONTEND_DIR="$SCRIPT_DIR/frontend"
 BACKEND_DIR="$SCRIPT_DIR/backend"
-LOG_FILE="$BACKEND_DIR/logs/flask.log"
+
 
 # Check if tmux is installed
 if ! command -v tmux &> /dev/null; then
@@ -31,8 +31,14 @@ fi
 
 # Function to check if a process is running
 is_process_running() {
-    pgrep -f "$1" > /dev/null 2>&1
+    if ps aux | grep "$1" | grep -v grep > /dev/null 2>&1; then
+        return 0
+    else
+        return 1
+    fi
 }
+
+
 
 # Create tmux sessions and windows
 # Frontend Session
@@ -42,19 +48,22 @@ fi
 
 # Backend Session
 if ! tmux has-session -t backendSession 2>/dev/null; then
-    tmux new-session -d -s backendSession -n backend "cd $BACKEND_DIR && source $BACKEND_DIR/venv/bin/activate && zsh"
-    tmux send-keys -t backendSession:backend "python3 flask_server.py" C-m
-    tmux new-window -t backendSession -n logs "tail -f $LOG_FILE"
+    tmux new-session -d -s backendSession -n backend "cd $BACKEND_DIR; source venv/bin/activate; python3 flask_server.py"
 fi
 
 # Database Session
 if ! tmux has-session -t databaseSession 2>/dev/null; then
-    tmux new-session -d -s databaseSession -n sqlite "sqlite3 $DB_FILE"
+    tmux new-session -d -s databaseSession -n database "sqlite3 $DB_FILE"
 fi
+
+echo "Waiting for sessions to start..."
+sleep 1
 
 # Frontend Session Handling
 if tmux has-session -t frontendSession 2>/dev/null; then
-    if ! is_process_running "node.*react-scripts start"; then
+    if is_process_running "[n]ode.*react-scripts start"; then
+        echo "React development server is running"
+    else
         echo "React development server is not running"
     fi
 else
@@ -63,7 +72,9 @@ fi
 
 # Backend Session Handling
 if tmux has-session -t backendSession 2>/dev/null; then
-    if ! is_process_running "python3.*flask_server.py"; then
+    if is_process_running "[p]ython.*flask_server.py"; then
+        echo "Flask server is running"
+    else
         echo "Flask server is not running"
     fi
 else
@@ -72,11 +83,13 @@ fi
 
 # Database Session Handling
 if tmux has-session -t databaseSession 2>/dev/null; then
-    if ! is_process_running "sqlite3.*database.db"; then
-        echo "No active SQLite connection found"
+    if is_process_running "[s]qlite3.*database.db"; then
+        echo "SQLite database is running"
+    else
+        echo "SQLite database is not running"
     fi
 else
     echo "Tmux session 'databaseSession' not found."
 fi
 
-echo "All sessions and windows have been created or already exist. Use 'tmux attach-session -t frontendSession' or other session names to connect."
+echo "Use 'tmux attach -t frontendSession' or other session names to connect."

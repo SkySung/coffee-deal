@@ -42,3 +42,5 @@ backend/database.db
 How
 
 test/
+test.sh
+test_2.sh

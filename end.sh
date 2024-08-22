@@ -28,27 +28,21 @@ if [ ! -f "$DB_FILE" ]; then
     # python3 "$BACKEND_DIR/init_database.py"
 fi
 
-# Function to check if a process is running
-is_process_running() {
-    pgrep -f "$1" > /dev/null 2>&1
-}
-
 # Function to kill a process
 kill_process() {
-    pkill -f "$1"
-    sleep 1  # 等待一段時間以確保進程停止
-    if is_process_running "$1"; then
-        echo "Failed to stop $2"
-    else
-        echo "Stopped $2"
+    local session_name="$1"
+    local window_name="$2"
+    tmux send-keys -t "$session_name:$window_name" C-c
+    if tmux has-session -t "$session_name" 2>/dev/null; then
+        tmux send-keys -t "$session_name:$window_name" C-d
     fi
 }
+
 
 # Function to kill a tmux session if it exists
 kill_tmux_session() {
     local session_name="$1"
     if tmux has-session -t "$session_name" 2>/dev/null; then
-        echo "Killing tmux session: $session_name"
         tmux kill-session -t "$session_name"
     else
         echo "No tmux session named $session_name found."
@@ -58,12 +52,7 @@ kill_tmux_session() {
 # Frontend Session Handling
 if tmux has-session -t frontendSession 2>/dev/null; then
     # Stop React development server
-    if is_process_running "node.*react-scripts start"; then
-        kill_process "node.*react-scripts start" "React development server"
-    else
-        echo "React development server is not running"
-    fi
-
+    kill_process "frontendSession" "frontend"
     # Kill tmux session
     kill_tmux_session "frontendSession"
 else
@@ -73,12 +62,7 @@ fi
 # Backend Session Handling
 if tmux has-session -t backendSession 2>/dev/null; then
     # Stop Flask server
-    if is_process_running "python3.*flask_server.py"; then
-        kill_process "python3.*flask_server.py" "Flask server"
-    else
-        echo "Flask server is not running"
-    fi
-
+    kill_process "backendSession" "backend"
     # Kill tmux session
     kill_tmux_session "backendSession"
 else
@@ -88,12 +72,7 @@ fi
 # Database Session Handling
 if tmux has-session -t databaseSession 2>/dev/null; then
     # Check if SQLite connection exists
-    if is_process_running "sqlite3.*database.db"; then
-        kill_process "sqlite3.*database.db" "SQLite connection"
-    else
-        echo "No active SQLite connection found"
-    fi
-
+    kill_process "databaseSession" "database"
     # Kill tmux session
     kill_tmux_session "databaseSession"
 else
